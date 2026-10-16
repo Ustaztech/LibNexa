@@ -1,0 +1,23 @@
+{
+  "short_name": "LIBNEXA",
+  "name": "LIBNEXA: Mobile Library Catalog and Borrowing Management System",
+  "icons": [
+    {
+      "src": "/branding/libnexa-app-icon.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/branding/libnexa-symbol.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#082B60",
+  "theme_color": "#082B60",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "description": "Your Library. Your Access. Anywhere. - Nasarawa State University, Keffi (NSUK)"
+}

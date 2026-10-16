@@ -1,0 +1,326 @@
+// LIBNEXA Production Database Schema (MySQL)
+// Matching all constraints, relational integrity, and indexes
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String                  @id @default(uuid()) @db.VarChar(36)
+  fullName             String                  @db.VarChar(120)
+  email                String                  @unique @db.VarChar(150)
+  passwordHash         String                  @db.VarChar(255)
+  matricNumber         String?                 @unique @db.VarChar(50)
+  membershipNumber     String?                 @unique @db.VarChar(50)
+  department           String?                 @db.VarChar(100)
+  faculty              String?                 @db.VarChar(100)
+  phone                String?                 @db.VarChar(25)
+  role                 String                  @default("STUDENT") @db.VarChar(20) // STUDENT | LIBRARIAN | ADMIN
+  accountStatus        String                  @default("ACTIVE") @db.VarChar(25)  // ACTIVE | PENDING_VERIFICATION | SUSPENDED | INACTIVE
+  emailVerifiedAt      DateTime?               @db.DateTime(0)
+  mustChangePassword   Boolean                 @default(false)
+  createdAt            DateTime                @default(now()) @db.DateTime(0)
+  updatedAt            DateTime                @updatedAt @db.DateTime(0)
+
+  // Relationships
+  borrowingRequests    BorrowingRequest[]      @relation("UserBorrowingRequests")
+  reviewedRequests     BorrowingRequest[]      @relation("LibrarianReviewedRequests")
+  loans                Loan[]                  @relation("UserLoans")
+  processedLoans       Loan[]                  @relation("LibrarianProcessedLoans")
+  returnProcessedLoans Loan[]                  @relation("LibrarianReturnProcessedLoans")
+  reservations         Reservation[]           @relation("UserReservations")
+  renewalsRequested    Renewal[]               @relation("UserRenewalsRequested")
+  renewalsReviewed     Renewal[]               @relation("LibrarianRenewalsReviewed")
+  notifications        Notification[]
+  notificationPref     NotificationPreference?
+  pushDevices          PushDevice[]
+  auditLogs            AuditLog[]              @relation("ActorAuditLogs")
+  settingsUpdated      LibrarySetting[]        @relation("UserUpdatedSettings")
+
+  @@index([role])
+  @@index([email])
+  @@map("users")
+}
+
+model Book {
+  id                 String             @id @default(uuid()) @db.VarChar(36)
+  title              String             @db.VarChar(255)
+  isbn               String             @unique @db.VarChar(30)
+  description        String             @db.Text
+  publisherId        String?            @db.VarChar(36)
+  publicationYear    Int?
+  edition            String?            @db.VarChar(50)
+  language           String             @default("English") @db.VarChar(50)
+  coverImageUrl      String?            @db.VarChar(500)
+  createdAt          DateTime           @default(now()) @db.DateTime(0)
+  updatedAt          DateTime           @updatedAt @db.DateTime(0)
+
+  // Relationships
+  publisher          Publisher?         @relation(fields: [publisherId], references: [id], onDelete: SetNull)
+  authors            BookAuthor[]
+  categories         BookCategory[]
+  copies             BookCopy[]
+  borrowingRequests  BorrowingRequest[]
+  reservations       Reservation[]
+
+  @@index([title])
+  @@index([isbn])
+  @@map("books")
+}
+
+model Author {
+  id        String       @id @default(uuid()) @db.VarChar(36)
+  name      String       @unique @db.VarChar(150)
+  books     BookAuthor[]
+
+  @@map("authors")
+}
+
+model BookAuthor {
+  bookId    String @db.VarChar(36)
+  authorId  String @db.VarChar(36)
+  book      Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  author    Author @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@id([bookId, authorId])
+  @@map("book_authors")
+}
+
+model Category {
+  id          String         @id @default(uuid()) @db.VarChar(36)
+  name        String         @unique @db.VarChar(100)
+  description String?        @db.Text
+  books       BookCategory[]
+
+  @@map("categories")
+}
+
+model BookCategory {
+  bookId     String   @db.VarChar(36)
+  categoryId String   @db.VarChar(36)
+  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([bookId, categoryId])
+  @@map("book_categories")
+}
+
+model Publisher {
+  id    String @id @default(uuid()) @db.VarChar(36)
+  name  String @unique @db.VarChar(150)
+  books Book[]
+
+  @@map("publishers")
+}
+
+model BookCopy {
+  id               String        @id @default(uuid()) @db.VarChar(36)
+  bookId           String        @db.VarChar(36)
+  accessionNumber  String        @unique @db.VarChar(50)
+  barcode          String?       @unique @db.VarChar(50)
+  shelfLocation    String        @db.VarChar(100)
+  condition        String        @default("GOOD") @db.VarChar(20)      // NEW | GOOD | FAIR | DAMAGED
+  status           String        @default("AVAILABLE") @db.VarChar(25) // AVAILABLE | RESERVED | ON_LOAN | UNDER_MAINTENANCE | LOST | WITHDRAWN
+  acquisitionDate  DateTime?     @db.Date
+  createdAt        DateTime      @default(now()) @db.DateTime(0)
+  updatedAt        DateTime      @updatedAt @db.DateTime(0)
+
+  // Relationships
+  book             Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  loans            Loan[]
+  assignedReservations Reservation[] @relation("AssignedCopyReservations")
+
+  @@index([bookId])
+  @@index([status])
+  @@index([accessionNumber])
+  @@map("book_copies")
+}
+
+model BorrowingRequest {
+  id                 String    @id @default(uuid()) @db.VarChar(36)
+  userId             String    @db.VarChar(36)
+  bookId             String    @db.VarChar(36)
+  assignedCopyId     String?   @db.VarChar(36)
+  status             String    @default("PENDING") @db.VarChar(25) // PENDING | APPROVED | REJECTED | COLLECTED | EXPIRED | CANCELLED
+  requestedAt        DateTime  @default(now()) @db.DateTime(0)
+  reviewedById       String?   @db.VarChar(36)
+  reviewedAt         DateTime? @db.DateTime(0)
+  rejectionReason    String?   @db.Text
+  collectionDeadline DateTime? @db.DateTime(0)
+  createdAt          DateTime  @default(now()) @db.DateTime(0)
+  updatedAt          DateTime  @updatedAt @db.DateTime(0)
+
+  // Relationships
+  user               User      @relation("UserBorrowingRequests", fields: [userId], references: [id], onDelete: Cascade)
+  book               Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  reviewedBy         User?     @relation("LibrarianReviewedRequests", fields: [reviewedById], references: [id], onDelete: SetNull)
+  loan               Loan?
+
+  @@index([userId])
+  @@index([bookId])
+  @@index([status])
+  @@map("borrowing_requests")
+}
+
+model Loan {
+  id                  String            @id @default(uuid()) @db.VarChar(36)
+  borrowingRequestId  String?           @unique @db.VarChar(36)
+  userId              String            @db.VarChar(36)
+  bookCopyId          String            @db.VarChar(36)
+  borrowedAt          DateTime          @default(now()) @db.DateTime(0)
+  dueAt               DateTime          @db.DateTime(0)
+  returnedAt          DateTime?         @db.DateTime(0)
+  status              String            @default("ACTIVE") @db.VarChar(20) // ACTIVE | RETURNED | OVERDUE
+  returnCondition     String?           @db.VarChar(20)
+  returnNotes         String?           @db.Text
+  processedById       String?           @db.VarChar(36)
+  returnProcessedById String?           @db.VarChar(36)
+
+  // Relationships
+  borrowingRequest    BorrowingRequest? @relation(fields: [borrowingRequestId], references: [id], onDelete: SetNull)
+  user                User              @relation("UserLoans", fields: [userId], references: [id], onDelete: Cascade)
+  bookCopy            BookCopy          @relation(fields: [bookCopyId], references: [id], onDelete: Restrict)
+  processedBy         User?             @relation("LibrarianProcessedLoans", fields: [processedById], references: [id], onDelete: SetNull)
+  returnProcessedBy   User?             @relation("LibrarianReturnProcessedLoans", fields: [returnProcessedById], references: [id], onDelete: SetNull)
+  renewals            Renewal[]
+
+  @@index([userId])
+  @@index([bookCopyId])
+  @@index([status])
+  @@index([dueAt])
+  @@map("loans")
+}
+
+model Reservation {
+  id             String    @id @default(uuid()) @db.VarChar(36)
+  userId         String    @db.VarChar(36)
+  bookId         String    @db.VarChar(36)
+  assignedCopyId String?   @db.VarChar(36)
+  queuePosition  Int
+  status         String    @default("PENDING") @db.VarChar(25) // PENDING | QUEUED | READY_FOR_COLLECTION | FULFILLED | CANCELLED | EXPIRED
+  reservedAt     DateTime  @default(now()) @db.DateTime(0)
+  availableAt    DateTime? @db.DateTime(0)
+  expiresAt      DateTime? @db.DateTime(0)
+  fulfilledAt    DateTime? @db.DateTime(0)
+  createdAt      DateTime  @default(now()) @db.DateTime(0)
+  updatedAt      DateTime  @updatedAt @db.DateTime(0)
+
+  // Relationships
+  user           User      @relation("UserReservations", fields: [userId], references: [id], onDelete: Cascade)
+  book           Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  assignedCopy   BookCopy? @relation("AssignedCopyReservations", fields: [assignedCopyId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([bookId])
+  @@index([status])
+  @@map("reservations")
+}
+
+model Renewal {
+  id              String    @id @default(uuid()) @db.VarChar(36)
+  loanId          String    @db.VarChar(36)
+  requestedById   String    @db.VarChar(36)
+  reviewedById    String?   @db.VarChar(36)
+  oldDueAt        DateTime  @db.DateTime(0)
+  newDueAt        DateTime  @db.DateTime(0)
+  status          String    @default("PENDING") @db.VarChar(20) // PENDING | APPROVED | REJECTED
+  reason          String?   @db.Text
+  rejectionReason String?   @db.Text
+  createdAt       DateTime  @default(now()) @db.DateTime(0)
+  reviewedAt      DateTime? @db.DateTime(0)
+
+  // Relationships
+  loan            Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  requestedBy     User      @relation("UserRenewalsRequested", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy      User?     @relation("LibrarianRenewalsReviewed", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([loanId])
+  @@index([requestedById])
+  @@index([status])
+  @@map("renewals")
+}
+
+model Notification {
+  id             String    @id @default(uuid()) @db.VarChar(36)
+  userId         String    @db.VarChar(36)
+  type           String    @db.VarChar(25) // BORROWING | LOAN | RESERVATION | ACCOUNT | SYSTEM
+  title          String    @db.VarChar(200)
+  message        String    @db.Text
+  channel        String    @default("IN_APP") @db.VarChar(20) // IN_APP | EMAIL | PUSH
+  deliveryStatus String    @default("DELIVERED") @db.VarChar(20) // DELIVERED | SENT | FAILED | SIMULATED
+  readAt         DateTime? @db.DateTime(0)
+  sentAt         DateTime  @default(now()) @db.DateTime(0)
+  createdAt      DateTime  @default(now()) @db.DateTime(0)
+
+  // Relationships
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([readAt])
+  @@index([type])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id              String   @id @default(uuid()) @db.VarChar(36)
+  userId          String   @unique @db.VarChar(36)
+  emailEnabled    Boolean  @default(true)
+  pushEnabled     Boolean  @default(true)
+  reminderEnabled Boolean  @default(true)
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("notification_preferences")
+}
+
+model PushDevice {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  userId      String    @db.VarChar(36)
+  deviceToken String    @db.VarChar(255)
+  platform    String    @default("WEB") @db.VarChar(20) // ANDROID | IOS | WEB
+  createdAt   DateTime  @default(now()) @db.DateTime(0)
+  revokedAt   DateTime? @db.DateTime(0)
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_devices")
+}
+
+model LibrarySetting {
+  id           String   @id @default(uuid()) @db.VarChar(36)
+  settingKey   String   @unique @db.VarChar(100)
+  settingValue String   @db.Text
+  description  String?  @db.VarChar(255)
+  updatedById  String?  @db.VarChar(36)
+  updatedAt    DateTime @updatedAt @db.DateTime(0)
+
+  updatedBy    User?    @relation("UserUpdatedSettings", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([settingKey])
+  @@map("library_settings")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  actorId    String?  @db.VarChar(36)
+  action     String   @db.VarChar(100)
+  entityType String   @db.VarChar(50)
+  entityId   String?  @db.VarChar(36)
+  oldValues  String?  @db.Text
+  newValues  String?  @db.Text
+  ipAddress  String?  @db.VarChar(45)
+  createdAt  DateTime @default(now()) @db.DateTime(0)
+
+  actor      User?    @relation("ActorAuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

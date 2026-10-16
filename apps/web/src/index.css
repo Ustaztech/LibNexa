@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-navy: #082B60;
+  --brand-royal: #1268B3;
+  --brand-teal: #079BA9;
+  --brand-cyan: #11C4D2;
+  --brand-gold: #D7A53B;
+  --brand-bg: #F5F8FC;
+  --brand-dark: #172438;
+  --brand-muted: #66758A;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, .font-heading {
+  font-family: 'Outfit', 'Inter', sans-serif;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(8, 43, 96, 0.04);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(18, 104, 179, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(18, 104, 179, 0.5);
+}
+
+/* Glassmorphism helpers */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.dark .glass-panel {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Animated subtle mesh gradient */
+.mesh-gradient-header {
+  background: linear-gradient(135deg, #082B60 0%, #1268B3 55%, #079BA9 100%);
+}
+
+.gold-gradient {
+  background: linear-gradient(135deg, #E6BC5C 0%, #D7A53B 50%, #B88523 100%);
+}
+
+/* Mobile tap highlight reset */
+* {
+  -webkit-tap-highlight-color: transparent;
+}

@@ -1,0 +1,306 @@
+// LIBNEXA Database Schema
+// Optimized for zero-dependency local execution via SQLite & full MySQL production parity
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String                  @id @default(uuid())
+  fullName             String
+  email                String                  @unique
+  passwordHash         String
+  matricNumber         String?                 @unique
+  membershipNumber     String?                 @unique
+  department           String?
+  faculty              String?
+  phone                String?
+  role                 String                  @default("STUDENT") // STUDENT | LIBRARIAN | ADMIN
+  accountStatus        String                  @default("ACTIVE")  // ACTIVE | PENDING_VERIFICATION | SUSPENDED | INACTIVE
+  emailVerifiedAt      DateTime?
+  mustChangePassword   Boolean                 @default(false)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  // Relationships
+  borrowingRequests    BorrowingRequest[]      @relation("UserBorrowingRequests")
+  reviewedRequests     BorrowingRequest[]      @relation("LibrarianReviewedRequests")
+  loans                Loan[]                  @relation("UserLoans")
+  processedLoans       Loan[]                  @relation("LibrarianProcessedLoans")
+  returnProcessedLoans Loan[]                  @relation("LibrarianReturnProcessedLoans")
+  reservations         Reservation[]           @relation("UserReservations")
+  renewalsRequested    Renewal[]               @relation("UserRenewalsRequested")
+  renewalsReviewed     Renewal[]               @relation("LibrarianRenewalsReviewed")
+  notifications        Notification[]
+  notificationPref     NotificationPreference?
+  pushDevices          PushDevice[]
+  auditLogs            AuditLog[]              @relation("ActorAuditLogs")
+  settingsUpdated      LibrarySetting[]        @relation("UserUpdatedSettings")
+
+  @@index([role])
+  @@index([email])
+}
+
+model Book {
+  id                 String             @id @default(uuid())
+  title              String
+  isbn               String             @unique
+  description        String
+  publisherId        String?
+  publicationYear    Int?
+  edition            String?
+  language           String             @default("English")
+  coverImageUrl      String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  // Relationships
+  publisher          Publisher?         @relation(fields: [publisherId], references: [id], onDelete: SetNull)
+  authors            BookAuthor[]
+  categories         BookCategory[]
+  copies             BookCopy[]
+  borrowingRequests  BorrowingRequest[]
+  reservations       Reservation[]
+
+  @@index([title])
+  @@index([isbn])
+}
+
+model Author {
+  id        String       @id @default(uuid())
+  name      String       @unique
+  books     BookAuthor[]
+}
+
+model BookAuthor {
+  bookId    String
+  authorId  String
+  book      Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  author    Author @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@id([bookId, authorId])
+}
+
+model Category {
+  id          String         @id @default(uuid())
+  name        String         @unique
+  description String?
+  books       BookCategory[]
+}
+
+model BookCategory {
+  bookId     String
+  categoryId String
+  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([bookId, categoryId])
+}
+
+model Publisher {
+  id    String @id @default(uuid())
+  name  String @unique
+  books Book[]
+}
+
+model BookCopy {
+  id               String        @id @default(uuid())
+  bookId           String
+  accessionNumber  String        @unique
+  barcode          String?       @unique
+  shelfLocation    String
+  condition        String        @default("GOOD")      // NEW | GOOD | FAIR | DAMAGED
+  status           String        @default("AVAILABLE") // AVAILABLE | RESERVED | ON_LOAN | UNDER_MAINTENANCE | LOST | WITHDRAWN
+  acquisitionDate  DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relationships
+  book             Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  loans            Loan[]
+  assignedReservations Reservation[] @relation("AssignedCopyReservations")
+
+  @@index([bookId])
+  @@index([status])
+  @@index([accessionNumber])
+}
+
+model BorrowingRequest {
+  id                 String    @id @default(uuid())
+  userId             String
+  bookId             String
+  assignedCopyId     String?
+  status             String    @default("PENDING") // PENDING | APPROVED | REJECTED | COLLECTED | EXPIRED | CANCELLED
+  requestedAt        DateTime  @default(now())
+  reviewedById       String?
+  reviewedAt         DateTime?
+  rejectionReason    String?
+  collectionDeadline DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relationships
+  user               User      @relation("UserBorrowingRequests", fields: [userId], references: [id], onDelete: Cascade)
+  book               Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  reviewedBy         User?     @relation("LibrarianReviewedRequests", fields: [reviewedById], references: [id], onDelete: SetNull)
+  loan               Loan?
+
+  @@index([userId])
+  @@index([bookId])
+  @@index([status])
+}
+
+model Loan {
+  id                  String            @id @default(uuid())
+  borrowingRequestId  String?           @unique
+  userId              String
+  bookCopyId          String
+  borrowedAt          DateTime          @default(now())
+  dueAt               DateTime
+  returnedAt          DateTime?
+  status              String            @default("ACTIVE") // ACTIVE | RETURNED | OVERDUE
+  returnCondition     String?
+  returnNotes         String?
+  processedById       String?
+  returnProcessedById String?
+
+  // Relationships
+  borrowingRequest    BorrowingRequest? @relation(fields: [borrowingRequestId], references: [id], onDelete: SetNull)
+  user                User              @relation("UserLoans", fields: [userId], references: [id], onDelete: Cascade)
+  bookCopy            BookCopy          @relation(fields: [bookCopyId], references: [id], onDelete: Restrict)
+  processedBy         User?             @relation("LibrarianProcessedLoans", fields: [processedById], references: [id], onDelete: SetNull)
+  returnProcessedBy   User?             @relation("LibrarianReturnProcessedLoans", fields: [returnProcessedById], references: [id], onDelete: SetNull)
+  renewals            Renewal[]
+
+  @@index([userId])
+  @@index([bookCopyId])
+  @@index([status])
+  @@index([dueAt])
+}
+
+model Reservation {
+  id             String    @id @default(uuid())
+  userId         String
+  bookId         String
+  assignedCopyId String?
+  queuePosition  Int
+  status         String    @default("PENDING") // PENDING | QUEUED | READY_FOR_COLLECTION | FULFILLED | CANCELLED | EXPIRED
+  reservedAt     DateTime  @default(now())
+  availableAt    DateTime?
+  expiresAt      DateTime?
+  fulfilledAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relationships
+  user           User      @relation("UserReservations", fields: [userId], references: [id], onDelete: Cascade)
+  book           Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  assignedCopy   BookCopy? @relation("AssignedCopyReservations", fields: [assignedCopyId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([bookId])
+  @@index([status])
+}
+
+model Renewal {
+  id              String    @id @default(uuid())
+  loanId          String
+  requestedById   String
+  reviewedById    String?
+  oldDueAt        DateTime
+  newDueAt        DateTime
+  status          String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  reason          String?
+  rejectionReason String?
+  createdAt       DateTime  @default(now())
+  reviewedAt      DateTime?
+
+  // Relationships
+  loan            Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  requestedBy     User      @relation("UserRenewalsRequested", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy      User?     @relation("LibrarianRenewalsReviewed", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([loanId])
+  @@index([requestedById])
+  @@index([status])
+}
+
+model Notification {
+  id             String    @id @default(uuid())
+  userId         String
+  type           String    // BORROWING | LOAN | RESERVATION | ACCOUNT | SYSTEM
+  title          String
+  message        String
+  channel        String    @default("IN_APP") // IN_APP | EMAIL | PUSH
+  deliveryStatus String    @default("DELIVERED") // DELIVERED | SENT | FAILED | SIMULATED
+  readAt         DateTime?
+  sentAt         DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+
+  // Relationships
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([readAt])
+  @@index([type])
+}
+
+model NotificationPreference {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  emailEnabled    Boolean  @default(true)
+  pushEnabled     Boolean  @default(true)
+  reminderEnabled Boolean  @default(true)
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PushDevice {
+  id          String    @id @default(uuid())
+  userId      String
+  deviceToken String
+  platform    String    @default("WEB") // ANDROID | IOS | WEB
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model LibrarySetting {
+  id           String   @id @default(uuid())
+  settingKey   String   @unique
+  settingValue String
+  description  String?
+  updatedById  String?
+  updatedAt    DateTime @updatedAt
+
+  updatedBy    User?    @relation("UserUpdatedSettings", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([settingKey])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  action     String   // e.g., BORROW_REQUEST_APPROVED, BOOK_RETURNED, USER_ROLE_UPDATED
+  entityType String   // e.g., BorrowingRequest, Loan, Book, User, Setting
+  entityId   String?
+  oldValues  String?  // JSON formatted
+  newValues  String?  // JSON formatted
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  actor      User?    @relation("ActorAuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+}

@@ -1,0 +1,24 @@
+{
+  "name": "libnexa-monorepo",
+  "version": "1.0.0",
+  "description": "LIBNEXA: Mobile Library Catalog and Borrowing Management System (NSUK)",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm --prefix apps/api install && npm --prefix apps/web install",
+    "dev": "concurrently \"npm --prefix apps/api run dev\" \"npm --prefix apps/web run dev\"",
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:mobile": "npm --prefix apps/mobile run start",
+    "build": "npm --prefix packages/shared run build && npm --prefix apps/api run build && npm --prefix apps/web run build",
+    "test": "npm --prefix apps/api test && node tests/acceptance.test.js",
+    "test:acceptance": "node tests/acceptance.test.js",
+    "db:seed": "npm --prefix apps/api run db:seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
