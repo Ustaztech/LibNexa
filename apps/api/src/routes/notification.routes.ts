@@ -4,6 +4,8 @@ import * as notifService from '../services/notification.service';
 import { runDueRemindersJob } from '../services/reminderScheduler';
 import { authenticate, AuthenticatedRequest, requireStaff } from '../middleware/auth';
 import prisma from '../db/prisma';
+import { config } from '../config/env';
+import { verifySmtpConnection, sendNotificationEmail } from '../services/email.service';
 
 const router = Router();
 
@@ -11,6 +13,8 @@ const prefSchema = z.object({
   emailEnabled: z.boolean().optional(),
   pushEnabled: z.boolean().optional(),
   reminderEnabled: z.boolean().optional(),
+  newBookAlerts: z.boolean().optional(),
+  bookAvailableAlerts: z.boolean().optional(),
 });
 
 // GET /notifications
@@ -59,6 +63,8 @@ router.get('/preferences', authenticate, async (req: AuthenticatedRequest, res, 
           emailEnabled: true,
           pushEnabled: true,
           reminderEnabled: true,
+          newBookAlerts: true,
+          bookAvailableAlerts: true,
         },
       });
     }
@@ -80,6 +86,8 @@ router.patch('/preferences', authenticate, async (req: AuthenticatedRequest, res
         emailEnabled: validated.emailEnabled ?? true,
         pushEnabled: validated.pushEnabled ?? true,
         reminderEnabled: validated.reminderEnabled ?? true,
+        newBookAlerts: validated.newBookAlerts ?? true,
+        bookAvailableAlerts: validated.bookAvailableAlerts ?? true,
       },
     });
     res.json({ success: true, data: pref });
@@ -93,6 +101,82 @@ router.post('/trigger-reminders', authenticate, requireStaff, async (req, res, n
   try {
     const result = await runDueRemindersJob();
     res.json({ success: true, ...result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /notifications/smtp-status
+router.get('/smtp-status', authenticate, async (req, res, next) => {
+  try {
+    const connectionTest = await verifySmtpConnection();
+    res.json({
+      success: true,
+      data: {
+        isConfigured: config.smtp.isConfigured,
+        host: config.smtp.host || 'Not set',
+        port: config.smtp.port,
+        from: config.smtp.from,
+        connectionTest,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /notifications/test-email
+router.post('/test-email', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+    });
+
+    if (!user || !user.email) {
+      return res.status(400).json({
+        success: false,
+        message: 'No registered email address found on your account.',
+      });
+    }
+
+    const testPayload = {
+      to: user.email,
+      recipientName: user.fullName,
+      type: 'SYSTEM' as const,
+      title: 'LIBNEXA Email Notification Test',
+      message: 'This is a test notification confirming that automated email push is active and configured for your LIBNEXA account.',
+      actionUrl: config.appBaseUrl,
+      actionLabel: 'Go to Library Dashboard',
+    };
+
+    const emailResult = await sendNotificationEmail(testPayload);
+
+    // Also record it in the notification database table
+    await prisma.notification.create({
+      data: {
+        userId: user.id,
+        type: 'SYSTEM',
+        title: testPayload.title,
+        message: testPayload.message,
+        channel: 'EMAIL',
+        deliveryStatus: emailResult.success
+          ? (emailResult.simulated ? 'SIMULATED' : 'SENT')
+          : 'FAILED',
+        sentAt: new Date(),
+      },
+    });
+
+    res.json({
+      success: emailResult.success,
+      message: emailResult.simulated
+        ? `Test notification simulated (Dev mode). Target: ${user.email}`
+        : `Test notification successfully dispatched to ${user.email}`,
+      data: {
+        recipient: user.email,
+        simulated: emailResult.simulated,
+        messageId: emailResult.messageId,
+      },
+    });
   } catch (err) {
     next(err);
   }

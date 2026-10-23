@@ -1,6 +1,7 @@
 import prisma from '../db/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { recordAuditLog } from './audit.service';
+import { notifyUsersOfNewBook } from './bookNotification.service';
 
 export interface BookFilterParams {
   search?: string;
@@ -291,6 +292,11 @@ export const createBook = async (input: CreateBookInput, actorId?: string) => {
     entityType: 'Book',
     entityId: book.id,
     newValues: { title: book.title, isbn: book.isbn },
+  });
+
+  // Automatically notify users when new books are added via email
+  notifyUsersOfNewBook(book.id).catch((err: any) => {
+    console.error('[AUTO EMAIL NOTIFICATION] Failed to notify users of new book:', err.message);
   });
 
   return getBookById(book.id);

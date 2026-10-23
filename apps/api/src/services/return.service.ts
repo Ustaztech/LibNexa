@@ -3,6 +3,7 @@ import { AppError } from '../middleware/errorHandler';
 import { recordAuditLog } from './audit.service';
 import { sendNotification } from './notification.service';
 import { getSettingInt } from './setting.service';
+import { notifyUsersOfBookAvailable } from './bookNotification.service';
 
 export interface ProcessReturnInput {
   loanId: string;
@@ -116,9 +117,21 @@ export const processBookReturn = async (input: ProcessReturnInput) => {
 
     await sendNotification({
       userId: result.promotedReservation.userId,
-      type: 'RESERVATION',
+      type: 'BOOK_AVAILABLE',
       title: 'Reserved Book Ready for Collection!',
       message: `A copy of "${result.loan.bookCopy.book.title}" is now available for your reservation. Please visit the library circulation desk by ${formattedExpires} to collect it.`,
+      availabilityDetails: {
+        title: result.loan.bookCopy.book.title,
+        shelfLocation: result.loan.bookCopy.shelfLocation,
+        accessionNumber: result.loan.bookCopy.accessionNumber,
+        expiresAt: formattedExpires,
+        isReservationPickup: true,
+      },
+    });
+  } else if (condition !== 'DAMAGED') {
+    // If returned to general stock as AVAILABLE, notify general subscribers
+    notifyUsersOfBookAvailable(result.loan.bookCopy.bookId, result.loan.bookCopyId).catch((err: any) => {
+      console.error('[AUTO EMAIL NOTIFICATION] Failed to notify availability on book return:', err.message);
     });
   }
 

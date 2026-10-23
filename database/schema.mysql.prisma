@@ -36,11 +36,12 @@ model User {
   reservations         Reservation[]           @relation("UserReservations")
   renewalsRequested    Renewal[]               @relation("UserRenewalsRequested")
   renewalsReviewed     Renewal[]               @relation("LibrarianRenewalsReviewed")
-  notifications        Notification[]
-  notificationPref     NotificationPreference?
-  pushDevices          PushDevice[]
-  auditLogs            AuditLog[]              @relation("ActorAuditLogs")
-  settingsUpdated      LibrarySetting[]        @relation("UserUpdatedSettings")
+  notifications             Notification[]
+  notificationPref          NotificationPreference?
+  pushDevices               PushDevice[]
+  auditLogs                 AuditLog[]                     @relation("ActorAuditLogs")
+  settingsUpdated           LibrarySetting[]               @relation("UserUpdatedSettings")
+  availabilitySubscriptions BookAvailabilitySubscription[]
 
   @@index([role])
   @@index([email])
@@ -65,8 +66,9 @@ model Book {
   authors            BookAuthor[]
   categories         BookCategory[]
   copies             BookCopy[]
-  borrowingRequests  BorrowingRequest[]
-  reservations       Reservation[]
+  borrowingRequests         BorrowingRequest[]
+  reservations              Reservation[]
+  availabilitySubscriptions BookAvailabilitySubscription[]
 
   @@index([title])
   @@index([isbn])
@@ -267,14 +269,33 @@ model Notification {
 }
 
 model NotificationPreference {
-  id              String   @id @default(uuid()) @db.VarChar(36)
-  userId          String   @unique @db.VarChar(36)
-  emailEnabled    Boolean  @default(true)
-  pushEnabled     Boolean  @default(true)
-  reminderEnabled Boolean  @default(true)
+  id                  String   @id @default(uuid()) @db.VarChar(36)
+  userId              String   @unique @db.VarChar(36)
+  emailEnabled        Boolean  @default(true)
+  pushEnabled         Boolean  @default(true)
+  reminderEnabled     Boolean  @default(true)
+  newBookAlerts       Boolean  @default(true)
+  bookAvailableAlerts Boolean  @default(true)
 
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@map("notification_preferences")
+}
+
+model BookAvailabilitySubscription {
+  id         String    @id @default(uuid()) @db.VarChar(36)
+  userId     String    @db.VarChar(36)
+  bookId     String    @db.VarChar(36)
+  status     String    @default("ACTIVE") @db.VarChar(20) // ACTIVE | NOTIFIED | CANCELLED
+  notifiedAt DateTime? @db.DateTime(0)
+  createdAt  DateTime  @default(now()) @db.DateTime(0)
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book       Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+  @@index([bookId, status])
+  @@index([userId])
+  @@map("book_availability_subscriptions")
 }
 
 model PushDevice {

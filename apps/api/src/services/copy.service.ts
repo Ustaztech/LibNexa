@@ -1,6 +1,7 @@
 import prisma from '../db/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { recordAuditLog } from './audit.service';
+import { notifyUsersOfBookAvailable } from './bookNotification.service';
 
 export interface CreateCopyInput {
   bookId: string;
@@ -95,6 +96,13 @@ export const createCopy = async (input: CreateCopyInput, actorId?: string) => {
     newValues: { accessionNumber: copy.accessionNumber, bookTitle: book.title },
   });
 
+  // If newly registered copy is AVAILABLE, notify reservation queue or subscribers
+  if (copy.status === 'AVAILABLE') {
+    notifyUsersOfBookAvailable(copy.bookId, copy.id).catch((err: any) => {
+      console.error('[AUTO EMAIL NOTIFICATION] Failed to notify availability on copy creation:', err.message);
+    });
+  }
+
   return copy;
 };
 
@@ -135,6 +143,13 @@ export const updateCopy = async (
     oldValues: existing,
     newValues: updated,
   });
+
+  // If status transitioned to AVAILABLE, trigger automated availability notification
+  if (updated.status === 'AVAILABLE' && existing.status !== 'AVAILABLE') {
+    notifyUsersOfBookAvailable(updated.bookId, updated.id).catch((err: any) => {
+      console.error('[AUTO EMAIL NOTIFICATION] Failed to notify availability on copy update:', err.message);
+    });
+  }
 
   return updated;
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckCheck, Bell, Shield, BookOpen, AlertCircle, Clock, Settings, Sparkles } from 'lucide-react';
+import { X, CheckCheck, Bell, Shield, BookOpen, AlertCircle, Clock, Settings, Sparkles, Mail, Loader2 } from 'lucide-react';
 import { NotificationItem } from '../../types';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -21,14 +21,30 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   const { role } = useAuth();
   const { showToast } = useToast();
   const [showPreferences, setShowPreferences] = useState(false);
-  const [preferences, setPreferences] = useState({ emailEnabled: true, pushEnabled: true, reminderEnabled: true });
+  const [preferences, setPreferences] = useState({
+    emailEnabled: true,
+    pushEnabled: true,
+    reminderEnabled: true,
+    newBookAlerts: true,
+    bookAvailableAlerts: true,
+  });
   const [isTriggeringReminders, setIsTriggeringReminders] = useState(false);
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [smtpInfo, setSmtpInfo] = useState<{ isConfigured: boolean; host: string } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       api.getNotificationPreferences()
         .then((res) => {
           if (res.success && res.data) setPreferences(res.data);
+        })
+        .catch(() => {});
+
+      api.getSmtpStatus()
+        .then((res) => {
+          if (res.success && res.data) {
+            setSmtpInfo({ isConfigured: res.data.isConfigured, host: res.data.host });
+          }
         })
         .catch(() => {});
     }
@@ -82,8 +98,29 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
     }
   };
 
+  const handleSendTestEmail = async () => {
+    setIsSendingTestEmail(true);
+    try {
+      const res = await api.sendTestEmail();
+      showToast({
+        type: 'success',
+        title: 'Test Email Dispatched',
+        message: res.message || `Notification sent to ${res.data.recipient}`,
+      });
+      onRefresh();
+    } catch (err: any) {
+      showToast({ type: 'error', title: 'Email Test Failed', message: err.message });
+    } finally {
+      setIsSendingTestEmail(false);
+    }
+  };
+
   const getIcon = (type: NotificationItem['type']) => {
     switch (type) {
+      case 'NEW_BOOK':
+        return <BookOpen className="w-4 h-4 text-purple-400" />;
+      case 'BOOK_AVAILABLE':
+        return <CheckCheck className="w-4 h-4 text-emerald-400" />;
       case 'BORROWING':
         return <BookOpen className="w-4 h-4 text-brand-cyan" />;
       case 'LOAN':
@@ -168,6 +205,56 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                     className="rounded text-brand-teal focus:ring-brand-cyan"
                   />
                 </label>
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-white/70">New Book Arrivals (Email)</span>
+                  <input
+                    type="checkbox"
+                    checked={preferences.newBookAlerts}
+                    onChange={(e) => handleSavePreferences({ ...preferences, newBookAlerts: e.target.checked })}
+                    className="rounded text-brand-teal focus:ring-brand-cyan"
+                  />
+                </label>
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-white/70">Book Availability Alerts (Email)</span>
+                  <input
+                    type="checkbox"
+                    checked={preferences.bookAvailableAlerts}
+                    onChange={(e) => handleSavePreferences({ ...preferences, bookAvailableAlerts: e.target.checked })}
+                    className="rounded text-brand-teal focus:ring-brand-cyan"
+                  />
+                </label>
+              </div>
+
+              <div className="pt-2.5 border-t border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-white/50">SMTP:</span>
+                  {smtpInfo?.isConfigured ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      Live Ready
+                    </span>
+                  ) : (
+                    <span
+                      className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                      title="Emails are displayed in the server terminal console in simulated dev mode"
+                    >
+                      Simulated Dev
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSendTestEmail}
+                  disabled={isSendingTestEmail}
+                  className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-[11px] font-medium transition-all flex items-center gap-1 disabled:opacity-50"
+                  title="Send a sample email notification to your account email address"
+                >
+                  {isSendingTestEmail ? (
+                    <Loader2 className="w-3 h-3 animate-spin text-brand-cyan" />
+                  ) : (
+                    <Mail className="w-3 h-3 text-brand-cyan" />
+                  )}
+                  {isSendingTestEmail ? 'Sending...' : 'Send Test Email'}
+                </button>
               </div>
             </div>
           )}

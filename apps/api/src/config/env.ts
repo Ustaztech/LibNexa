@@ -16,9 +16,10 @@ export const config = {
   smtp: {
     host: process.env.SMTP_HOST || '',
     port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true' || parseInt(process.env.SMTP_PORT || '587', 10) === 465,
     user: process.env.SMTP_USER || '',
     password: process.env.SMTP_PASSWORD || '',
-    from: process.env.MAIL_FROM || 'noreply-library@nsuk.edu.ng',
+    from: process.env.MAIL_FROM || 'LIBNEXA Library <noreply-library@nsuk.edu.ng>',
     isConfigured: !!(process.env.SMTP_HOST && process.env.SMTP_USER),
   },
 

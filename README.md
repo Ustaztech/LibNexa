@@ -135,6 +135,22 @@ npm test
 7. **Loan Renewal Request & Review**: Student extension request, reservation conflict checking, librarian approval, and due date recalculation.
 8. **Physical Copy Inventory Lifecycle**: Accessioning, barcode collision prevention, and condition management.
 9. **Security & Authentication Constraints**: Duplicate matriculation prevention, suspended account rejection, and role-based route guard integrity.
+10. **Automated Email Notifications**: Automatic email dispatch on new book additions, waitlist availability alerts, and copy restock notifications.
+
+---
+
+## 🌐 Deployment & Detailed Documentation
+
+For full step-by-step instructions on deploying the Web Portal to **Vercel**, deploying the Backend API, configuring live SMTP, and feature walkthroughs for all personas, see:
+
+📖 **[Complete Deployment & Feature Walkthrough Guide](file:///docs/DEPLOYMENT_AND_USAGE_GUIDE.md)**
+
+### Vercel Quick Deploy
+- **Web App Directory**: `apps/web` (or root using pre-configured [`vercel.json`](file:///vercel.json))
+- **Framework**: `Vite`
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist` (or `apps/web/dist`)
+- **Environment Variable**: `VITE_API_URL=https://your-api-domain.com/api/v1`
 
 ---
 

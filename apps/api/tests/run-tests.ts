@@ -9,6 +9,7 @@ import * as renewalService from '../src/services/renewal.service';
 import * as reportService from '../src/services/report.service';
 import * as adminService from '../src/services/admin.service';
 import * as copyService from '../src/services/copy.service';
+import * as bookNotifService from '../src/services/bookNotification.service';
 
 async function runTests() {
   console.log('=======================================================');
@@ -419,8 +420,116 @@ async function runTests() {
     await prisma.user.delete({ where: { id: suspendedUser.id } });
   });
 
+  // TEST 10: Automated Email Notifications for New Books and Book Availability
+  await test('10. Automated Email Notifications: New Books Added & Availability Alerts', async () => {
+    // A: Create student with active email notifications
+    const subscriberStudent = await prisma.user.create({
+      data: {
+        fullName: 'Email Subscriber Student',
+        email: `notif.subscriber.${Date.now()}@nsuk.edu.ng`,
+        passwordHash: await bcrypt.hash('Pass1234!', 10),
+        matricNumber: `NOTIFTEST/${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+        role: 'STUDENT',
+        accountStatus: 'ACTIVE',
+        notificationPref: {
+          create: {
+            emailEnabled: true,
+            pushEnabled: true,
+            reminderEnabled: true,
+            newBookAlerts: true,
+            bookAvailableAlerts: true,
+          },
+        },
+      },
+      include: { notificationPref: true },
+    });
+
+    const testIsbn = `978-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
+
+    // B: Register a brand-new book title
+    const createdBook = await bookService.createBook({
+      title: 'Quantum Computing Fundamentals & Algorithms',
+      isbn: testIsbn,
+      description: 'Comprehensive introductory guide into quantum computing, qubits and quantum gates.',
+      authorNames: ['Prof. K. A. Mohammed', 'Dr. S. O. Daniel'],
+      categoryNames: ['Computer Science', 'Quantum Physics'],
+      publicationYear: 2026,
+    });
+
+    // C: Verify automated new book notification was dispatched (poll for async background dispatch)
+    let newBookNotif = null;
+    for (let i = 0; i < 15; i++) {
+      newBookNotif = await prisma.notification.findFirst({
+        where: {
+          userId: subscriberStudent.id,
+          type: 'NEW_BOOK',
+        },
+      });
+      if (newBookNotif) break;
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    if (!newBookNotif || !newBookNotif.title.includes('Quantum Computing')) {
+      throw new Error('Automated new book email notification was not dispatched to eligible member');
+    }
+
+    // D: Test Book Availability Subscription
+    const sub = await bookNotifService.subscribeToBookAvailability(subscriberStudent.id, createdBook.id);
+    if (sub.status !== 'ACTIVE') {
+      throw new Error('Failed to subscribe student to book availability alert');
+    }
+
+    const checkSub = await bookNotifService.getBookSubscriptionStatus(subscriberStudent.id, createdBook.id);
+    if (!checkSub.isSubscribed) {
+      throw new Error('Subscription status check returned false for active subscription');
+    }
+
+    // E: Register physical copy with status AVAILABLE -> Triggers availability notification
+    const testAccession = `ACC-NOTIF-${Date.now().toString().slice(-6)}`;
+    await copyService.createCopy({
+      bookId: createdBook.id,
+      accessionNumber: testAccession,
+      shelfLocation: 'Reserve Stacks, CS-03',
+      condition: 'NEW',
+      status: 'AVAILABLE',
+    });
+
+    // F: Poll for updated subscription status to NOTIFIED and notification creation
+    let updatedSub = null;
+    let availNotif = null;
+    for (let i = 0; i < 15; i++) {
+      updatedSub = await prisma.bookAvailabilitySubscription.findUnique({
+        where: { id: sub.id },
+      });
+      availNotif = await prisma.notification.findFirst({
+        where: {
+          userId: subscriberStudent.id,
+          type: 'BOOK_AVAILABLE',
+        },
+      });
+      if (updatedSub?.status === 'NOTIFIED' && availNotif) break;
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    if (updatedSub?.status !== 'NOTIFIED' || !updatedSub.notifiedAt) {
+      throw new Error('Availability alert did not transition subscription status to NOTIFIED with timestamp');
+    }
+
+    if (!availNotif || !availNotif.message.includes('Quantum Computing')) {
+      throw new Error('Automated book availability notification was not dispatched to subscriber');
+    }
+
+    // Clean up created book
+    await prisma.bookCopy.deleteMany({ where: { bookId: createdBook.id } });
+    await prisma.bookAuthor.deleteMany({ where: { bookId: createdBook.id } });
+    await prisma.bookCategory.deleteMany({ where: { bookId: createdBook.id } });
+    await prisma.bookAvailabilitySubscription.deleteMany({ where: { bookId: createdBook.id } });
+    await prisma.book.delete({ where: { id: createdBook.id } });
+  });
+
   // Teardown: Clean up all test data so test execution is non-destructive
   console.log('[TEARDOWN] Purging test accounts, mock transactions and resetting catalog...');
+  await prisma.bookAvailabilitySubscription.deleteMany({});
   await prisma.notification.deleteMany({
     where: {
       OR: [
@@ -431,6 +540,7 @@ async function runTests() {
         { user: { email: { contains: 'renewal.' } } },
         { user: { email: { contains: 'baseline.' } } },
         { user: { email: { contains: 'desk.staff.' } } },
+        { user: { email: { contains: 'notif.' } } },
       ],
     },
   });
@@ -498,6 +608,7 @@ async function runTests() {
         { email: { contains: 'baseline.' } },
         { email: { contains: 'imposter.' } },
         { email: { contains: 'desk.staff.' } },
+        { email: { contains: 'notif.' } },
       ],
     },
   });

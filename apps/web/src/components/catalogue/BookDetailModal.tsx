@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Book as BookType } from '../../types';
-import { X, BookOpen, MapPin, Calendar, Hash, Bookmark, CheckCircle2, Clock, ShieldCheck, AlertCircle, Users } from 'lucide-react';
+import { X, BookOpen, MapPin, Calendar, Hash, Bookmark, CheckCircle2, Clock, ShieldCheck, AlertCircle, Users, Bell, Mail, Loader2, Check } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import api from '../../services/api';
 
 interface BookDetailModalProps {
   book: BookType | null;
@@ -19,7 +21,69 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
   onReserve,
 }) => {
   const { role } = useAuth();
+  const { showToast } = useToast();
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [loadingSub, setLoadingSub] = useState(false);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && book) {
+      api.getBookSubscriptionStatus(book.id)
+        .then((res) => {
+          if (res.success && res.data) {
+            setIsSubscribed(res.data.isSubscribed);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen, book]);
+
   if (!isOpen || !book) return null;
+
+  const handleToggleSubscription = async () => {
+    if (!book) return;
+    setLoadingSub(true);
+    try {
+      if (isSubscribed) {
+        await api.unsubscribeFromBookAvailability(book.id);
+        setIsSubscribed(false);
+        showToast({
+          type: 'info',
+          title: 'Unsubscribed',
+          message: `You will no longer receive availability emails for "${book.title}".`,
+        });
+      } else {
+        await api.subscribeToBookAvailability(book.id);
+        setIsSubscribed(true);
+        showToast({
+          type: 'success',
+          title: 'Subscribed to Email Alerts',
+          message: `We will automatically email you as soon as "${book.title}" is available!`,
+        });
+      }
+    } catch (err: any) {
+      showToast({ type: 'error', title: 'Subscription Error', message: err.message });
+    } finally {
+      setLoadingSub(false);
+    }
+  };
+
+  const handleBroadcastArrival = async () => {
+    if (!book) return;
+    setIsBroadcasting(true);
+    try {
+      const res = await api.broadcastNewBookArrival(book.id);
+      showToast({
+        type: 'success',
+        title: 'New Book Email Dispatched',
+        message: res.message || `Notified active library members about "${book.title}".`,
+      });
+    } catch (err: any) {
+      showToast({ type: 'error', title: 'Dispatch Failed', message: err.message });
+    } finally {
+      setIsBroadcasting(false);
+    }
+  };
 
   const isAvailable = book.availableCopies > 0;
   const authorNames = Array.isArray(book.authors)
@@ -203,7 +267,25 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
             Close
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Staff Broadcast Action */}
+            {(role === 'LIBRARIAN' || role === 'ADMIN') && (
+              <button
+                type="button"
+                onClick={handleBroadcastArrival}
+                disabled={isBroadcasting}
+                className="px-3.5 py-2 rounded-xl bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/30 text-purple-600 dark:text-purple-300 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                title="Send automated new arrival email alert to all active library members"
+              >
+                {isBroadcasting ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+                ) : (
+                  <Mail className="w-3.5 h-3.5 text-purple-400" />
+                )}
+                {isBroadcasting ? 'Broadcasting...' : 'Broadcast Email'}
+              </button>
+            )}
+
             {isAvailable ? (
               <button
                 onClick={() => {
@@ -216,16 +298,40 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
                 Submit Borrow Request
               </button>
             ) : (
-              <button
-                onClick={() => {
-                  onReserve(book);
-                  onClose();
-                }}
-                className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md transition-all flex items-center gap-2"
-              >
-                <Users className="w-4 h-4" />
-                Join Waitlist / Reserve Book
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Notify Me When Available Button */}
+                <button
+                  type="button"
+                  onClick={handleToggleSubscription}
+                  disabled={loadingSub}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm border ${
+                    isSubscribed
+                      ? 'bg-emerald-600/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-600/25'
+                      : 'bg-white dark:bg-white/10 border-brand-navy/15 dark:border-white/15 text-brand-dark dark:text-white hover:bg-brand-bg dark:hover:bg-white/20'
+                  }`}
+                  title={isSubscribed ? 'Click to unsubscribe from email alerts' : 'Receive an email notification when a copy is available'}
+                >
+                  {loadingSub ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-teal" />
+                  ) : isSubscribed ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                  ) : (
+                    <Bell className="w-3.5 h-3.5 text-brand-teal" />
+                  )}
+                  {isSubscribed ? 'Subscribed to Alerts' : 'Email Me When Available'}
+                </button>
+
+                <button
+                  onClick={() => {
+                    onReserve(book);
+                    onClose();
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md transition-all flex items-center gap-2"
+                >
+                  <Users className="w-4 h-4" />
+                  Join Waitlist / Reserve
+                </button>
+              </div>
             )}
           </div>
         </div>

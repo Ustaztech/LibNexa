@@ -7,6 +7,8 @@ import {
   Reservation,
   Renewal,
   NotificationItem,
+  NotificationPreferences,
+  BookAvailabilitySubscription,
   LibrarySettingItem,
   AuditLogItem,
   Category,
@@ -170,6 +172,39 @@ class ApiClient {
     return this.request<{ success: boolean; data: { message: string } }>(`/books/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  async broadcastNewBookArrival(bookId: string) {
+    return this.request<{ success: boolean; message: string; data: { notifiedCount: number; bookTitle: string } }>(
+      `/books/${bookId}/notify-new-arrival`,
+      { method: 'POST' }
+    );
+  }
+
+  async subscribeToBookAvailability(bookId: string) {
+    return this.request<{ success: boolean; message: string; data: BookAvailabilitySubscription }>(
+      `/books/${bookId}/subscribe-availability`,
+      { method: 'POST' }
+    );
+  }
+
+  async unsubscribeFromBookAvailability(bookId: string) {
+    return this.request<{ success: boolean; message: string }>(
+      `/books/${bookId}/subscribe-availability`,
+      { method: 'DELETE' }
+    );
+  }
+
+  async getBookSubscriptionStatus(bookId: string) {
+    return this.request<{ success: boolean; data: { isSubscribed: boolean; subscription?: BookAvailabilitySubscription } }>(
+      `/books/${bookId}/availability-subscription`
+    );
+  }
+
+  async getUserBookSubscriptions() {
+    return this.request<{ success: boolean; data: BookAvailabilitySubscription[] }>(
+      '/books/user/subscriptions'
+    );
   }
 
   // Copies
@@ -373,16 +408,12 @@ class ApiClient {
   async getNotificationPreferences() {
     return this.request<{
       success: boolean;
-      data: { emailEnabled: boolean; pushEnabled: boolean; reminderEnabled: boolean };
+      data: NotificationPreferences;
     }>('/notifications/preferences');
   }
 
-  async updateNotificationPreferences(prefs: {
-    emailEnabled?: boolean;
-    pushEnabled?: boolean;
-    reminderEnabled?: boolean;
-  }) {
-    return this.request<{ success: boolean; data: any }>('/notifications/preferences', {
+  async updateNotificationPreferences(prefs: Partial<NotificationPreferences>) {
+    return this.request<{ success: boolean; data: NotificationPreferences }>('/notifications/preferences', {
       method: 'PATCH',
       body: JSON.stringify(prefs),
     });
@@ -393,6 +424,29 @@ class ApiClient {
       '/notifications/trigger-reminders',
       { method: 'POST' }
     );
+  }
+
+  async sendTestEmail() {
+    return this.request<{
+      success: boolean;
+      message: string;
+      data: { recipient: string; simulated: boolean; messageId?: string };
+    }>('/notifications/test-email', {
+      method: 'POST',
+    });
+  }
+
+  async getSmtpStatus() {
+    return this.request<{
+      success: boolean;
+      data: {
+        isConfigured: boolean;
+        host: string;
+        port: number;
+        from: string;
+        connectionTest: { verified: boolean; message: string };
+      };
+    }>('/notifications/smtp-status');
   }
 
   // Reports

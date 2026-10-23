@@ -133,7 +133,7 @@ export interface Renewal {
 export interface NotificationItem {
   id: string;
   userId: string;
-  type: 'BORROWING' | 'LOAN' | 'RESERVATION' | 'ACCOUNT' | 'SYSTEM';
+  type: 'BORROWING' | 'LOAN' | 'RESERVATION' | 'ACCOUNT' | 'SYSTEM' | 'NEW_BOOK' | 'BOOK_AVAILABLE';
   title: string;
   message: string;
   channel: 'IN_APP' | 'EMAIL' | 'PUSH';
@@ -141,6 +141,26 @@ export interface NotificationItem {
   readAt?: string;
   sentAt: string;
   createdAt: string;
+}
+
+export interface NotificationPreferences {
+  id?: string;
+  userId?: string;
+  emailEnabled: boolean;
+  pushEnabled: boolean;
+  reminderEnabled: boolean;
+  newBookAlerts: boolean;
+  bookAvailableAlerts: boolean;
+}
+
+export interface BookAvailabilitySubscription {
+  id: string;
+  userId: string;
+  bookId: string;
+  status: 'ACTIVE' | 'NOTIFIED' | 'CANCELLED';
+  notifiedAt?: string;
+  createdAt: string;
+  book?: Book;
 }
 
 export interface LibrarySettingItem {

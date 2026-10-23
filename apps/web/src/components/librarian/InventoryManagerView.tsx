@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Book, BookCopy } from '../../types';
-import { Plus, BookOpen, Layers, MapPin, Barcode, CheckCircle2, X, Search, ShieldCheck } from 'lucide-react';
+import { Plus, BookOpen, Layers, MapPin, Barcode, CheckCircle2, X, Search, ShieldCheck, Mail, Loader2 } from 'lucide-react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 
@@ -30,6 +30,7 @@ export const InventoryManagerView: React.FC<InventoryManagerViewProps> = ({ book
   const [newCopyShelf, setNewCopyShelf] = useState('');
   const [newCopyCondition, setNewCopyCondition] = useState<'NEW' | 'GOOD' | 'FAIR'>('NEW');
   const [isSubmittingCopy, setIsSubmittingCopy] = useState(false);
+  const [broadcastingBookId, setBroadcastingBookId] = useState<string | null>(null);
 
   const filteredBooks = books.filter((b) => {
     const q = searchTerm.toLowerCase();
@@ -52,7 +53,11 @@ export const InventoryManagerView: React.FC<InventoryManagerViewProps> = ({ book
         publicationYear: parseInt(newYear, 10) || 2024,
       });
 
-      showToast({ type: 'success', title: 'Book Added to Catalogue', message: `"${newTitle}" registered.` });
+      showToast({
+        type: 'success',
+        title: 'Book Added to Catalogue',
+        message: `"${newTitle}" registered and automated email notifications dispatched to students.`,
+      });
       setShowAddBookModal(false);
       setNewTitle('');
       setNewIsbn('');
@@ -63,6 +68,22 @@ export const InventoryManagerView: React.FC<InventoryManagerViewProps> = ({ book
       showToast({ type: 'error', title: 'Failed to create book', message: err.message });
     } finally {
       setIsSubmittingBook(false);
+    }
+  };
+
+  const handleBroadcastArrival = async (book: Book) => {
+    setBroadcastingBookId(book.id);
+    try {
+      const res = await api.broadcastNewBookArrival(book.id);
+      showToast({
+        type: 'success',
+        title: 'New Book Email Dispatched',
+        message: res.message || `Automated email notification sent for "${book.title}".`,
+      });
+    } catch (err: any) {
+      showToast({ type: 'error', title: 'Broadcast Failed', message: err.message });
+    } finally {
+      setBroadcastingBookId(null);
     }
   };
 
@@ -155,6 +176,20 @@ export const InventoryManagerView: React.FC<InventoryManagerViewProps> = ({ book
                 </div>
 
                 <button
+                  onClick={() => handleBroadcastArrival(b)}
+                  disabled={broadcastingBookId === b.id}
+                  className="px-3 py-1.5 rounded-xl bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/25 text-purple-600 dark:text-purple-300 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  title="Broadcast new book arrival email to all active students"
+                >
+                  {broadcastingBookId === b.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+                  ) : (
+                    <Mail className="w-3.5 h-3.5 text-purple-400" />
+                  )}
+                  <span>Broadcast Email</span>
+                </button>
+
+                <button
                   onClick={() => {
                     setSelectedBookForCopy(b);
                     setNewAccession(`NSUK-${b.isbn.substring(0, 4)}-${Math.floor(100 + Math.random() * 900)}`);
@@ -232,6 +267,11 @@ export const InventoryManagerView: React.FC<InventoryManagerViewProps> = ({ book
             </p>
 
             <form onSubmit={handleCreateBook} className="mt-4 space-y-3.5">
+              <div className="p-3 rounded-2xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/40 text-xs text-purple-800 dark:text-purple-300 flex items-center gap-2.5">
+                <Mail className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                <span>Automated email announcements will be dispatched to students upon registration.</span>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold mb-1">Book Title</label>
                 <input
