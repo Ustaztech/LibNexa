@@ -96,9 +96,30 @@ pm2 save
 pm2 startup
 ```
 
+## 5. Render Deployment (Temporary Free Tier)
+
+The repository includes a Render Blueprint in `render.yaml`. Connect the GitHub
+repository to Render and deploy the Blueprint to create the API and PostgreSQL
+database in Frankfurt. The API derives a PostgreSQL Prisma schema from the
+SQLite development schema during deployment; local development remains on
+SQLite.
+
+Both services use Render's free tier. Free web services can sleep when idle,
+and free PostgreSQL databases expire after 30 days. This setup is for testing,
+not production; upgrade the services and configure database backups before
+relying on it for library records.
+
+After deployment, verify `https://<service>.onrender.com/api/v1/health`. Before
+using the mobile app, open **Server API** on its sign-in screen and set the
+server URL to `https://<service>.onrender.com/api/v1`.
+
+The database schema is pushed automatically on API startup. Seed the initial
+catalog and administrator once, using the existing database seed procedure;
+do not run it on every deployment because it clears non-administrator accounts.
+
 ---
 
-## 5. Nginx Reverse Proxy Configuration
+## 6. Nginx Reverse Proxy Configuration
 
 Create `/etc/nginx/sites-available/libnexa`:
 

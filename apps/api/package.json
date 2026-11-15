@@ -8,10 +8,13 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "prisma:generate": "prisma generate",
+    "prisma:generate:render": "node scripts/prepare-render-schema.js && prisma generate --schema prisma/schema.render.prisma",
     "prisma:push": "prisma db push",
+    "prisma:push:render": "node scripts/prepare-render-schema.js && prisma db push --schema prisma/schema.render.prisma",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "db:seed": "ts-node src/seed.ts",
+    "start:render": "npm run prisma:push:render && node dist/index.js",
     "test": "ts-node tests/run-tests.ts"
   },
   "dependencies": {

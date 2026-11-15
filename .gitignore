@@ -30,6 +30,7 @@ out/
 *.sqlite3
 apps/api/prisma/*.db
 apps/api/prisma/*.db-journal
+apps/api/prisma/schema.render.prisma
 
 # Expo / React Native
 .expo/

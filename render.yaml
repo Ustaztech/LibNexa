@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: libnexa-nsuk-api
+    runtime: node
+    region: frankfurt
+    plan: free
+    buildCommand: npm ci --include=dev && npm --prefix packages/shared run build && npm --prefix apps/api run prisma:generate:render && npm --prefix apps/api run build
+    startCommand: npm --prefix apps/api run start:render
+    healthCheckPath: /api/v1/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: libnexa-nsuk-db
+          property: connectionString
+
+databases:
+  - name: libnexa-nsuk-db
+    databaseName: libnexa
+    user: libnexa
+    region: frankfurt
+    plan: free
