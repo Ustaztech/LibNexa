@@ -28,7 +28,7 @@ jobs:
 
       - name: Install mobile dependencies
         working-directory: apps/mobile
-        run: npm ci
+        run: npm ci --workspaces=false
 
       - name: Generate Android project
         working-directory: apps/mobile
