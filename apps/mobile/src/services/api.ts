@@ -3,7 +3,7 @@ import Constants from 'expo-constants';
 import { User, Book, BorrowingRequest, Loan, Reservation, Category, NotificationItem } from '../types';
 
 const extraUrl = (Constants.expoConfig as any)?.extra?.apiBaseUrl;
-export const DEFAULT_API_URL = extraUrl || 'http://10.111.185.208:5000/api/v1';
+export const DEFAULT_API_URL = extraUrl || 'https://libnexa-nsuk-api.onrender.com/api/v1';
 
 class MobileApiClient {
   private baseUrl: string = DEFAULT_API_URL;

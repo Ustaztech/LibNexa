@@ -109,9 +109,10 @@ and free PostgreSQL databases expire after 30 days. This setup is for testing,
 not production; upgrade the services and configure database backups before
 relying on it for library records.
 
-After deployment, verify `https://<service>.onrender.com/api/v1/health`. Before
-using the mobile app, open **Server API** on its sign-in screen and set the
-server URL to `https://<service>.onrender.com/api/v1`.
+After deployment, verify `https://<service>.onrender.com/api/v1/health`. The
+Android app defaults to the current Render API at
+`https://libnexa-nsuk-api.onrender.com/api/v1`; use **Server API** on its
+sign-in screen only when connecting to a different deployment.
 
 The database schema is pushed automatically on API startup. Seed the initial
 catalog and administrator once, using the existing database seed procedure;

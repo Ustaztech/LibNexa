@@ -28,7 +28,7 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "apiBaseUrl": "http://10.111.185.208:5000/api/v1"
+      "apiBaseUrl": "https://libnexa-nsuk-api.onrender.com/api/v1"
     }
   }
 }
