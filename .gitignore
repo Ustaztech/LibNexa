@@ -41,6 +41,7 @@ apps/api/prisma/schema.render.prisma
 *.key
 *.mobileprovision
 *.orig.*
+apps/mobile/android/app/debug.keystore
 
 # Logs
 npm-debug.log*
