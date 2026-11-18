@@ -286,15 +286,17 @@ The repository includes pre-configured [`vercel.json`](file:///c:/Users/THE%20DI
    - **Root Directory**: `./` (Leave as root)
    - **Build Command**: `npm --prefix packages/shared run build && npm --prefix apps/web run build`
    - **Output Directory**: `apps/web/dist`
-4. Expand **Environment Variables** and add:
-   - `VITE_API_URL` = `https://your-libnexa-api.onrender.com/api/v1` *(replace with your deployed API URL)*
+4. The web app defaults to the current Render API:
+   `https://libnexa-nsuk-api.onrender.com/api/v1`. Set `VITE_API_URL` only
+   when deploying against a different API.
 5. Click **"Deploy"**.
 
 #### Option B: Root Directory Set to `apps/web`
 1. When importing the project in Vercel, click **Edit** beside **Root Directory** and choose `apps/web`.
 2. Vercel automatically detects the Vite framework and uses [`apps/web/vercel.json`](file:///c:/Users/THE%20DIGITAL%20USTAZ/Documents/dev/LibNexa/apps/web/vercel.json).
-3. Set **Environment Variables**:
-   - `VITE_API_URL` = `https://your-libnexa-api.onrender.com/api/v1`
+3. The web app defaults to the current Render API:
+   `https://libnexa-nsuk-api.onrender.com/api/v1`. Set `VITE_API_URL` only
+   when deploying against a different API.
 4. Click **"Deploy"**.
 
 ---
@@ -367,7 +369,7 @@ Once configured, verify the connection anytime in the Web Portal by clicking **N
 
 - [ ] Web Portal deployed to Vercel and accessible via HTTPS.
 - [ ] Backend API deployed and responding at `https://<api-domain>/api/v1/health`.
-- [ ] `VITE_API_URL` set in Vercel settings pointing to the API.
+- [ ] Web API requests reach the configured API (the live Render API is the production default).
 - [ ] `CORS_ALLOWED_ORIGINS` in API settings includes the Vercel production domain.
 - [ ] Database initialized with `prisma db push` and seeded with `db:seed`.
 - [ ] SMTP connection tested using the *"Send Test Email"* button in the notification drawer.
