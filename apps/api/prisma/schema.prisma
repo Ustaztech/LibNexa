@@ -38,6 +38,7 @@ model User {
   renewalsReviewed     Renewal[]               @relation("LibrarianRenewalsReviewed")
   notifications             Notification[]
   notificationPref          NotificationPreference?
+  passwordResetTokens       PasswordResetToken[]
   pushDevices               PushDevice[]
   auditLogs                 AuditLog[]                     @relation("ActorAuditLogs")
   settingsUpdated           LibrarySetting[]               @relation("UserUpdatedSettings")
@@ -45,6 +46,18 @@ model User {
 
   @@index([role])
   @@index([email])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Book {

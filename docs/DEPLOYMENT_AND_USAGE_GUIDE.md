@@ -350,7 +350,7 @@ The REST API (`apps/api`) runs as a persistent Node.js service (ideal for Render
 
 ### Configuring Live SMTP Email Dispatch
 
-To send real emails to students (Gmail, Microsoft 365, Mailgun, Brevo, or SendGrid), set these variables on your deployed API server:
+Password reset links require live SMTP delivery; the reset endpoint does not expose links in API responses or simulated email logs. Set these variables in the Render API service's **Environment** settings (do not commit SMTP credentials or paste them into source files):
 
 #### Option 1: Using Gmail (Fastest & Free)
 1. Go to your Google Account $\rightarrow$ **Security** $\rightarrow$ Enable **2-Step Verification**.
@@ -377,6 +377,8 @@ MAIL_FROM="NSUK Library <noreply@nsuk.edu.ng>"
 
 Once configured, verify the connection anytime in the Web Portal by clicking **Notifications** $\rightarrow$ **Settings** $\rightarrow$ **Send Test Email**.
 
+The Render API's `APP_BASE_URL` must be `https://libnexa-nsuk-web.onrender.com` so password reset links return to the production sign-in page. Until SMTP is configured, password reset requests return an explicit service-unavailable error.
+
 ---
 
 ### Production Verification Checklist
@@ -385,6 +387,8 @@ Once configured, verify the connection anytime in the Web Portal by clicking **N
 - [ ] Backend API deployed and responding at `https://libnexa-nsuk-api.onrender.com/api/v1/health`.
 - [ ] Web API requests reach the configured API (the live Render API is the production default).
 - [ ] Render database schema, default settings, categories, and initial admin are initialized by the safe bootstrap.
+- [ ] The 18 records with valid, unique ISBNs are initialized by the safe bootstrap; the duplicate-ISBN and invalid-ISBN rows are omitted. Physical copies must be entered separately with real accession numbers and shelf locations.
 - [ ] SMTP connection tested using the *"Send Test Email"* button in the notification drawer.
+- [ ] Password reset email delivery is tested after live SMTP is configured.
 - [ ] Sample new book added to confirm automatic email notification delivery.
 - [ ] Sample book reserved to verify automated availability alerts.

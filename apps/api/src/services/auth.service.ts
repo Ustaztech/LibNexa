@@ -1,10 +1,12 @@
 import bcrypt from 'bcryptjs';
+import { createHash, randomBytes } from 'crypto';
 import jwt from 'jsonwebtoken';
 import prisma from '../db/prisma';
 import { config } from '../config/env';
 import { AppError } from '../middleware/errorHandler';
 import { recordAuditLog } from './audit.service';
 import { sendNotification } from './notification.service';
+import { sendPasswordResetEmail } from './email.service';
 
 export interface RegisterStudentInput {
   fullName: string;
@@ -220,6 +222,7 @@ export const changePassword = async (userId: string, oldPassword: string, newPas
       mustChangePassword: false,
     },
   });
+  await prisma.passwordResetToken.deleteMany({ where: { userId } });
 
   await recordAuditLog({
     actorId: userId,
@@ -229,4 +232,91 @@ export const changePassword = async (userId: string, oldPassword: string, newPas
   });
 
   return { message: 'Password changed successfully.' };
+};
+
+const passwordResetResponse = {
+  message: 'If an active account exists for that email, password reset instructions will be sent.',
+};
+
+export const requestPasswordReset = async (email: string) => {
+  if (!config.smtp.isConfigured) {
+    throw new AppError(
+      'Password reset is unavailable because email delivery is not configured. Please contact library support.',
+      503,
+      'PASSWORD_RESET_UNAVAILABLE'
+    );
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase().trim() },
+  });
+  if (!user || user.accountStatus === 'INACTIVE') {
+    return passwordResetResponse;
+  }
+
+  const token = randomBytes(32).toString('hex');
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+  await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+  const resetToken = await prisma.passwordResetToken.create({
+    data: { userId: user.id, tokenHash, expiresAt },
+  });
+
+  const resetUrl = new URL('/', config.appBaseUrl);
+  resetUrl.hash = new URLSearchParams({ resetToken: token }).toString();
+
+  try {
+    await sendPasswordResetEmail({
+      to: user.email,
+      recipientName: user.fullName,
+      resetUrl: resetUrl.toString(),
+    });
+  } catch {
+    await prisma.passwordResetToken.deleteMany({ where: { id: resetToken.id } });
+    console.error('[PASSWORD RESET] Email delivery failed.');
+    throw new AppError(
+      'Unable to deliver password reset instructions right now. Please try again later.',
+      503,
+      'PASSWORD_RESET_DELIVERY_FAILED'
+    );
+  }
+
+  return passwordResetResponse;
+};
+
+export const resetPassword = async (token: string, newPassword: string) => {
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const resetToken = await prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+  });
+
+  if (!resetToken || resetToken.expiresAt <= new Date()) {
+    throw new AppError('This password reset link is invalid or has expired.', 400, 'INVALID_RESET_TOKEN');
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await prisma.$transaction(async (transaction) => {
+    const claimedToken = await transaction.passwordResetToken.deleteMany({
+      where: { id: resetToken.id, expiresAt: { gt: new Date() } },
+    });
+    if (claimedToken.count !== 1) {
+      throw new AppError('This password reset link is invalid or has expired.', 400, 'INVALID_RESET_TOKEN');
+    }
+
+    await transaction.user.update({
+      where: { id: resetToken.userId },
+      data: { passwordHash, mustChangePassword: false },
+    });
+    await transaction.passwordResetToken.deleteMany({ where: { userId: resetToken.userId } });
+  });
+
+  await recordAuditLog({
+    actorId: resetToken.userId,
+    action: 'PASSWORD_RESET',
+    entityType: 'User',
+    entityId: resetToken.userId,
+  });
+
+  return { message: 'Password reset successfully. You can now sign in with your new password.' };
 };

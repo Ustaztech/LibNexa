@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
 import { BookOpen, Lock, Mail, User, School, CheckCircle2, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../services/api';
 
 export const AuthPage: React.FC = () => {
   const { login, register } = useAuth();
-  const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+  const [resetToken] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('resetToken') || '');
+  const [mode, setMode] = useState<'LOGIN' | 'REGISTER' | 'FORGOT_PASSWORD' | 'RESET_PASSWORD'>(
+    resetToken ? 'RESET_PASSWORD' : 'LOGIN'
+  );
+  const [feedback, setFeedback] = useState('');
+  const [feedbackIsError, setFeedbackIsError] = useState(false);
 
   // Sign In state
   const [identifier, setIdentifier] = useState('');
@@ -18,6 +24,9 @@ export const AuthPage: React.FC = () => {
   const [department, setDepartment] = useState('Computer Science');
   const [faculty, setFaculty] = useState('Faculty of Natural & Applied Sciences');
   const [regPassword, setRegPassword] = useState('');
+  const [resetEmail, setResetEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +58,66 @@ export const AuthPage: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  const handlePasswordResetRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setFeedback('');
+    try {
+      const result = await api.requestPasswordReset(resetEmail);
+      setFeedback(result.data.message);
+      setFeedbackIsError(false);
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : 'Unable to request a password reset right now.');
+      setFeedbackIsError(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setFeedback('The passwords do not match.');
+      setFeedbackIsError(true);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFeedback('');
+    try {
+      const result = await api.resetPassword(resetToken, newPassword);
+      setFeedback(result.data.message);
+      setFeedbackIsError(false);
+      setPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      window.history.replaceState({}, '', window.location.pathname);
+      setMode('LOGIN');
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : 'Unable to reset the password. Request a new reset link.');
+      setFeedbackIsError(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const isLogin = mode === 'LOGIN';
+  const isRegister = mode === 'REGISTER';
+  const authHeading = isLogin
+    ? 'Sign In to Your Account'
+    : isRegister
+      ? 'Student Account Registration'
+      : mode === 'FORGOT_PASSWORD'
+        ? 'Forgot your password?'
+        : 'Choose a new password';
+  const authDescription = isLogin
+    ? 'Enter your university email or matriculation number'
+    : isRegister
+      ? 'Register your NSUK student library membership profile'
+      : mode === 'FORGOT_PASSWORD'
+        ? 'Enter your account email and we will send reset instructions.'
+        : 'Your new password must be at least 8 characters long.';
 
   return (
     <div className="min-h-screen bg-brand-bg dark:bg-brand-dark flex items-center justify-center p-4 sm:p-6 lg:p-8">
@@ -119,23 +188,25 @@ export const AuthPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="font-heading font-bold text-2xl text-brand-dark dark:text-white">
-                    {mode === 'LOGIN' ? 'Sign In to Your Account' : 'Student Account Registration'}
+                    {authHeading}
                   </h2>
                   <p className="text-xs text-brand-mutedText dark:text-white/60 mt-1">
-                    {mode === 'LOGIN'
-                      ? 'Enter your university email or matriculation number'
-                      : 'Register your NSUK student library membership profile'}
+                    {authDescription}
                   </p>
                 </div>
               </div>
 
               {/* Mode Switcher */}
-              <div className="grid grid-cols-2 gap-1 bg-brand-bg dark:bg-white/5 p-1 rounded-2xl border border-brand-navy/10 dark:border-white/10 mt-5 text-xs font-semibold">
+              {(isLogin || isRegister) && (
+                <div className="grid grid-cols-2 gap-1 bg-brand-bg dark:bg-white/5 p-1 rounded-2xl border border-brand-navy/10 dark:border-white/10 mt-5 text-xs font-semibold">
                 <button
                   type="button"
-                  onClick={() => setMode('LOGIN')}
+                  onClick={() => {
+                    setFeedback('');
+                    setMode('LOGIN');
+                  }}
                   className={`py-2 rounded-xl transition-all ${
-                    mode === 'LOGIN'
+                    isLogin
                       ? 'bg-brand-royal text-white shadow-sm'
                       : 'text-brand-mutedText dark:text-white/60 hover:text-brand-dark'
                   }`}
@@ -144,20 +215,24 @@ export const AuthPage: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setMode('REGISTER')}
+                  onClick={() => {
+                    setFeedback('');
+                    setMode('REGISTER');
+                  }}
                   className={`py-2 rounded-xl transition-all ${
-                    mode === 'REGISTER'
+                    isRegister
                       ? 'bg-brand-royal text-white shadow-sm'
                       : 'text-brand-mutedText dark:text-white/60 hover:text-brand-dark'
                   }`}
                 >
                   Student Registration
                 </button>
-              </div>
+                </div>
+              )}
             </div>
 
             {/* SIGN IN FORM */}
-            {mode === 'LOGIN' ? (
+            {isLogin ? (
               <form onSubmit={handleLoginSubmit} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-brand-dark dark:text-white mb-1.5">
@@ -201,8 +276,18 @@ export const AuthPage: React.FC = () => {
                   <span>{isSubmitting ? 'Authenticating...' : 'Sign In to Portal'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFeedback('');
+                    setMode('FORGOT_PASSWORD');
+                  }}
+                  className="w-full text-xs font-semibold text-brand-royal dark:text-brand-cyan hover:underline"
+                >
+                  Forgot password?
+                </button>
               </form>
-            ) : (
+            ) : isRegister ? (
               /* STUDENT REGISTRATION FORM */
               <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
                 <div>
@@ -310,6 +395,96 @@ export const AuthPage: React.FC = () => {
                   <span>{isSubmitting ? 'Creating Profile...' : 'Complete Student Registration'}</span>
                 </button>
               </form>
+            ) : mode === 'FORGOT_PASSWORD' ? (
+              <form onSubmit={handlePasswordResetRequest} className="space-y-4">
+                <div>
+                  <label htmlFor="reset-email" className="block text-xs font-semibold text-brand-dark dark:text-white mb-1.5">
+                    Account Email
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-brand-mutedText absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      id="reset-email"
+                      type="email"
+                      required
+                      autoComplete="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="you@nsuk.edu.ng"
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-brand-bg dark:bg-white/5 border border-brand-navy/10 dark:border-white/10 text-xs text-brand-dark dark:text-white focus:outline-none focus:border-brand-royal dark:focus:border-brand-cyan"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-brand-royal to-brand-teal text-white font-bold text-xs disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Sending instructions...' : 'Send reset instructions'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFeedback('');
+                    setMode('LOGIN');
+                  }}
+                  className="w-full text-xs font-semibold text-brand-royal dark:text-brand-cyan hover:underline"
+                >
+                  Back to sign in
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handlePasswordReset} className="space-y-4">
+                <div>
+                  <label htmlFor="new-password" className="block text-xs font-semibold text-brand-dark dark:text-white mb-1.5">
+                    New Password
+                  </label>
+                  <input
+                    id="new-password"
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-brand-bg dark:bg-white/5 border border-brand-navy/10 dark:border-white/10 text-xs text-brand-dark dark:text-white focus:outline-none focus:border-brand-royal dark:focus:border-brand-cyan"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="confirm-password" className="block text-xs font-semibold text-brand-dark dark:text-white mb-1.5">
+                    Confirm New Password
+                  </label>
+                  <input
+                    id="confirm-password"
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-brand-bg dark:bg-white/5 border border-brand-navy/10 dark:border-white/10 text-xs text-brand-dark dark:text-white focus:outline-none focus:border-brand-royal dark:focus:border-brand-cyan"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !resetToken}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-brand-royal to-brand-teal text-white font-bold text-xs disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Updating password...' : 'Reset password'}
+                </button>
+                {!resetToken && (
+                  <p className="text-xs text-red-600" role="alert">This reset link is invalid. Request a new password reset link.</p>
+                )}
+              </form>
+            )}
+
+            {feedback && (
+              <p
+                className={`text-xs text-center ${feedbackIsError ? 'text-red-600' : 'text-emerald-700 dark:text-emerald-400'}`}
+                role={feedbackIsError ? 'alert' : 'status'}
+              >
+                {feedback}
+              </p>
             )}
 
             <div className="pt-4 border-t border-brand-navy/5 dark:border-white/10 text-center text-xs text-brand-mutedText dark:text-white/50">

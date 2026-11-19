@@ -105,6 +105,20 @@ class ApiClient {
     });
   }
 
+  async requestPasswordReset(email: string) {
+    return this.request<{ success: boolean; data: { message: string } }>('/auth/password-reset/request', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    return this.request<{ success: boolean; data: { message: string } }>('/auth/password-reset/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    });
+  }
+
   // Books
   async getBooks(params: {
     search?: string;

@@ -27,6 +27,37 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(8, 'New password must be at least 8 characters'),
 });
 
+const passwordResetRequestSchema = z.object({
+  email: z.string().email('Invalid email address'),
+});
+
+const passwordResetSchema = z.object({
+  token: z.string().length(64).regex(/^[a-f0-9]+$/i, 'Invalid reset token'),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+});
+
+// POST /auth/password-reset/request
+router.post('/password-reset/request', authRateLimiter(5), async (req, res, next) => {
+  try {
+    const validated = passwordResetRequestSchema.parse(req.body);
+    const result = await authService.requestPasswordReset(validated.email);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /auth/password-reset/confirm
+router.post('/password-reset/confirm', authRateLimiter(10), async (req, res, next) => {
+  try {
+    const validated = passwordResetSchema.parse(req.body);
+    const result = await authService.resetPassword(validated.token, validated.newPassword);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /auth/register
 router.post('/register', authRateLimiter(15), async (req, res, next) => {
   try {

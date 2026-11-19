@@ -430,6 +430,45 @@ export const sendEmail = async (options: SendEmailOptions): Promise<EmailResult>
   }
 };
 
+export const sendPasswordResetEmail = async (options: {
+  to: string;
+  recipientName: string;
+  resetUrl: string;
+}): Promise<void> => {
+  const mailer = getTransporter();
+  if (!mailer || !config.smtp.isConfigured) {
+    throw new Error('SMTP is not configured for password reset delivery.');
+  }
+
+  const escapeHtml = (value: string) =>
+    value.replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    })[character] || character);
+  const recipientName = escapeHtml(options.recipientName);
+  const resetUrl = escapeHtml(options.resetUrl);
+
+  await mailer.sendMail({
+    from: config.smtp.from,
+    to: options.to,
+    subject: '[LIBNEXA] Reset your password',
+    text: `Hello ${options.recipientName},\n\nUse this link within one hour to reset your LIBNEXA password:\n${options.resetUrl}\n\nIf you did not request this, you can ignore this email.`,
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#172554;max-width:560px;margin:0 auto;padding:24px">
+        <h1 style="font-size:22px">Reset your LIBNEXA password</h1>
+        <p>Hello ${recipientName},</p>
+        <p>Use the button below within one hour to choose a new password.</p>
+        <p><a href="${resetUrl}" style="display:inline-block;padding:12px 20px;background:#1d4ed8;color:#fff;text-decoration:none;border-radius:8px">Reset password</a></p>
+        <p>If you did not request this, you can ignore this email.</p>
+        <p style="font-size:12px;color:#64748b">Nasarawa State University, Keffi — University Library</p>
+      </div>
+    `,
+  });
+};
+
 /**
  * Convenience helper to send branded notification emails
  */
