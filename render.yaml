@@ -2,7 +2,7 @@ services:
   - type: web
     name: libnexa-nsuk-web
     runtime: static
-    buildCommand: npm ci --include=dev && npm --prefix packages/shared run build && npm --prefix apps/web run build
+    buildCommand: cd apps/web && npm ci --workspaces=false && npm run build
     staticPublishPath: apps/web/dist
     autoDeployTrigger: commit
     routes:
