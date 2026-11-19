@@ -9,6 +9,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { Navbar } from './components/layout/Navbar';
 import { NotificationDrawer } from './components/layout/NotificationDrawer';
 import { AuthPage } from './components/auth/AuthPage';
+import { ForcePasswordChangePage } from './components/auth/ForcePasswordChangePage';
 
 // Views
 import { BookCard } from './components/catalogue/BookCard';
@@ -264,6 +265,10 @@ export const App: React.FC = () => {
   // Strictly Require Authentication: If not logged in, show AuthPage full-screen
   if (!isAuthenticated) {
     return <AuthPage />;
+  }
+
+  if (user?.mustChangePassword) {
+    return <ForcePasswordChangePage />;
   }
 
   // Active loan and pending request counts for badges

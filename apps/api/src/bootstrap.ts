@@ -37,6 +37,47 @@ const catalogueBooks = [
   { title: 'Start With Why', author: 'Simon Sinek', isbn: '9781591846444', category: 'Business', publisher: 'Portfolio', year: 2009 },
 ];
 
+async function applyAdminLoginMigration(adminId: string) {
+  const email = process.env.LIBNEXA_ADMIN_MIGRATION_EMAIL?.trim().toLowerCase();
+  const fullName = process.env.LIBNEXA_ADMIN_MIGRATION_NAME?.trim();
+  const password = process.env.LIBNEXA_ADMIN_MIGRATION_PASSWORD;
+  if (!email && !fullName && !password) return;
+  if (!email || !fullName || !password || password.length < 16) {
+    throw new Error('Administrator login migration requires email, name, and a password of at least 16 characters.');
+  }
+
+  const admin = await prisma.user.findUnique({ where: { id: adminId } });
+  if (!admin || admin.role !== 'ADMIN') {
+    throw new Error('Cannot apply administrator login migration: existing administrator was not found.');
+  }
+  if (admin.email === email) return;
+
+  const conflictingUser = await prisma.user.findUnique({ where: { email } });
+  if (conflictingUser) {
+    throw new Error(`Cannot replace administrator login: ${email} is already assigned to another account.`);
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  await prisma.$transaction(async (transaction) => {
+    await transaction.user.update({
+      where: { id: adminId },
+      data: { email, fullName, passwordHash, mustChangePassword: true },
+    });
+    await transaction.auditLog.create({
+      data: {
+        actorId: adminId,
+        action: 'ADMIN_LOGIN_REPLACED',
+        entityType: 'User',
+        entityId: adminId,
+        oldValues: JSON.stringify({ email: admin.email }),
+        newValues: JSON.stringify({ email, fullName }),
+      },
+    });
+  });
+
+  console.log(`LIBNEXA bootstrap updated the primary administrator login to ${email}.`);
+}
+
 async function bootstrap() {
   await ensureDefaultSettings();
 
@@ -48,8 +89,8 @@ async function bootstrap() {
     });
   }
 
-  for (const book of catalogueBooks) {
-    await prisma.book.upsert({
+  for (const [index, book] of catalogueBooks.entries()) {
+    const cataloguedBook = await prisma.book.upsert({
       where: { isbn: book.isbn },
       update: {},
       create: {
@@ -85,10 +126,27 @@ async function bootstrap() {
         },
       },
     });
+
+    const accessionNumber = `NSUK-2026-${String(index + 1).padStart(3, '0')}`;
+    const copy = await prisma.bookCopy.upsert({
+      where: { accessionNumber },
+      update: {},
+      create: {
+        bookId: cataloguedBook.id,
+        accessionNumber,
+        shelfLocation: 'NSUK Library',
+        condition: 'GOOD',
+        status: 'AVAILABLE',
+      },
+    });
+    if (copy.bookId !== cataloguedBook.id) {
+      throw new Error(`Catalogue accession number ${accessionNumber} is assigned to a different book.`);
+    }
   }
 
   const existingAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
   if (existingAdmin) {
+    await applyAdminLoginMigration(existingAdmin.id);
     console.log('LIBNEXA bootstrap complete; existing administrator and data were preserved.');
     return;
   }
@@ -112,7 +170,7 @@ async function bootstrap() {
   }
 
   const passwordHash = await bcrypt.hash(initialPassword, 10);
-  await prisma.user.create({
+  const createdAdmin = await prisma.user.create({
     data: {
       fullName: 'System Administrator',
       email: INITIAL_ADMIN_EMAIL,
@@ -129,6 +187,7 @@ async function bootstrap() {
     },
   });
 
+  await applyAdminLoginMigration(createdAdmin.id);
   console.log(`LIBNEXA bootstrap created the initial administrator: ${INITIAL_ADMIN_EMAIL}.`);
 }
 
