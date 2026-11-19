@@ -1,5 +1,19 @@
 services:
   - type: web
+    name: libnexa-nsuk-web
+    runtime: static
+    buildCommand: npm ci --include=dev && npm --prefix packages/shared run build && npm --prefix apps/web run build
+    staticPublishPath: apps/web/dist
+    autoDeployTrigger: commit
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://libnexa-nsuk-api.onrender.com/api/v1
+
+  - type: web
     name: libnexa-nsuk-api
     runtime: node
     region: frankfurt
@@ -14,6 +28,8 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: INITIAL_ADMIN_PASSWORD
         generateValue: true
       - key: DATABASE_URL
         fromDatabase:

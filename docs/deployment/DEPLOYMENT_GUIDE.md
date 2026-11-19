@@ -7,9 +7,9 @@
 ## 1. Production Architecture Overview
 
 In production, LIBNEXA is deployed using:
-- **Web Portal**: Static SPA build served via Nginx or Cloudflare Pages / Vercel.
-- **RESTful API**: Node.js runtime process managed via PM2 or Docker container.
-- **Database**: Dedicated MySQL 8.0+ server with automated daily backups.
+- **Web Portal**: Render static site served over HTTPS and a global CDN.
+- **RESTful API**: Node.js service on Render.
+- **Database**: Render PostgreSQL for the hosted Blueprint, or a dedicated managed database for production.
 - **Reverse Proxy**: Nginx or Caddy terminating TLS (HTTPS) with Let's Encrypt certificates.
 
 ---
@@ -98,25 +98,30 @@ pm2 startup
 
 ## 5. Render Deployment (Temporary Free Tier)
 
-The repository includes a Render Blueprint in `render.yaml`. Connect the GitHub
-repository to Render and deploy the Blueprint to create the API and PostgreSQL
-database in Frankfurt. The API derives a PostgreSQL Prisma schema from the
-SQLite development schema during deployment; local development remains on
-SQLite.
+The repository includes a Render Blueprint in `render.yaml`. Sync it to create
+the web portal, API, and PostgreSQL database. The website is published at
+`https://libnexa-nsuk-web.onrender.com`; the API is at
+`https://libnexa-nsuk-api.onrender.com`. The API derives a PostgreSQL Prisma
+schema from the SQLite development schema during deployment; local development
+remains on SQLite.
 
-Both services use Render's free tier. Free web services can sleep when idle,
-and free PostgreSQL databases expire after 30 days. This setup is for testing,
-not production; upgrade the services and configure database backups before
-relying on it for library records.
+The API and database use Render's free tier. The API can sleep when idle, and
+the free PostgreSQL database expires after 30 days. The static website does not
+sleep. This setup is for testing, not production; upgrade the API/database and
+configure database backups before relying on it for library records.
 
-After deployment, verify `https://<service>.onrender.com/api/v1/health`. The
-Android app defaults to the current Render API at
-`https://libnexa-nsuk-api.onrender.com/api/v1`; use **Server API** on its
-sign-in screen only when connecting to a different deployment.
+After deployment, verify the website and
+`https://libnexa-nsuk-api.onrender.com/api/v1/health`. The web and Android apps
+default to the current Render API at
+`https://libnexa-nsuk-api.onrender.com/api/v1`.
 
-The database schema is pushed automatically on API startup. Seed the initial
-catalog and administrator once, using the existing database seed procedure;
-do not run it on every deployment because it clears non-administrator accounts.
+The database schema and default settings/categories are initialized on API
+startup. If no administrator exists, the safe bootstrap creates
+`admin@nsuk.edu.ng` using the generated `INITIAL_ADMIN_PASSWORD` in the API
+service's Render environment. Retrieve that secret from the Render dashboard;
+it is never logged or reset by subsequent deployments. Existing users,
+transactions, settings, and inventory are preserved. No sample books or copies
+are inserted: add real library inventory from the administrator portal.
 
 ---
 

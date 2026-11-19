@@ -23,8 +23,9 @@
    - [Librarian Circulation Desk & Inventory](#librarian-circulation-desk--inventory)
    - [Super Administrator Management](#super-administrator-management)
    - [Automated Email Notification System](#automated-email-notification-system)
-4. [Deployment Guide for Vercel & Production](#4-deployment-guide-for-vercel--production)
+4. [Deployment Guide for Render, Vercel & Production](#4-deployment-guide-for-render-vercel--production)
    - [Deployment Architecture Overview](#deployment-architecture-overview)
+   - [Current Render Blueprint](#current-render-blueprint)
    - [Deploying the Web Portal on Vercel](#deploying-the-web-portal-on-vercel)
    - [Deploying the Backend API](#deploying-the-backend-api)
    - [Configuring Live SMTP Email Dispatch](#configuring-live-smtp-email-dispatch)
@@ -149,12 +150,13 @@ This concurrently launches:
 
 ### Default Administrative Accounts
 
-| Account Role | Email Address | Default Password | Access Level |
+| Account Role | Email Address | Credential | Access Level |
 | :--- | :--- | :--- | :--- |
-| **System Administrator** | `admin@nsuk.edu.ng` | `Admin@NSUK2026!` | Full Institutional Privileges |
-| **Library Management** | `admin@libnexa.nsuk.edu.ng` | `Admin@NSUK2026!` | Full Institutional Privileges |
+| **Local seeded administrator** | `admin@nsuk.edu.ng` | Local development only; created by `npm run db:seed` | Full Institutional Privileges |
 
 > **Self-Registration for Students**: Students can register instantly using the *"Create Student Account"* button on the login screen with their Matriculation Number and NSUK email.
+>
+> **Render production administrator**: `admin@nsuk.edu.ng` is created only when the database has no administrator. Its initial password is the generated `INITIAL_ADMIN_PASSWORD` in the Render API service environment. Do not run `npm run db:seed` against production; that legacy development seed clears user activity and resets inventory copies.
 
 ### Interactive Swagger API Documentation
 Open your browser and navigate to:
@@ -249,7 +251,7 @@ Every user can customize their delivery channels by clicking the **Bell** icon i
 
 ---
 
-## 4. Deployment Guide for Vercel & Production
+## 4. Deployment Guide for Render, Vercel & Production
 
 ### Deployment Architecture Overview
 
@@ -271,6 +273,18 @@ Because LibNexa is a monorepo featuring a **React 18 SPA** (`apps/web`) and a **
                                              │  Railway MySQL / AWS RDS             │
                                              └──────────────────────────────────────┘
 ```
+
+### Current Render Blueprint
+
+The root `render.yaml` deploys the current website, API, and PostgreSQL database:
+
+- Website: `https://libnexa-nsuk-web.onrender.com`
+- API: `https://libnexa-nsuk-api.onrender.com/api/v1`
+- The website build is configured with the API URL; local development keeps using the Vite `/api/v1` proxy.
+- The API initializes default settings and academic categories without deleting existing data. If no administrator exists, it provisions `admin@nsuk.edu.ng` from the generated `INITIAL_ADMIN_PASSWORD` secret in the Render API service settings.
+- No sample book copies are inserted. Add the university's actual inventory in the admin portal.
+
+The API free instance may sleep when idle and the free PostgreSQL database expires after 30 days. Use persistent paid resources and backups for real library operations.
 
 ---
 
@@ -367,11 +381,10 @@ Once configured, verify the connection anytime in the Web Portal by clicking **N
 
 ### Production Verification Checklist
 
-- [ ] Web Portal deployed to Vercel and accessible via HTTPS.
-- [ ] Backend API deployed and responding at `https://<api-domain>/api/v1/health`.
+- [ ] Web Portal deployed to Render at `https://libnexa-nsuk-web.onrender.com` and accessible via HTTPS.
+- [ ] Backend API deployed and responding at `https://libnexa-nsuk-api.onrender.com/api/v1/health`.
 - [ ] Web API requests reach the configured API (the live Render API is the production default).
-- [ ] `CORS_ALLOWED_ORIGINS` in API settings includes the Vercel production domain.
-- [ ] Database initialized with `prisma db push` and seeded with `db:seed`.
+- [ ] Render database schema, default settings, categories, and initial admin are initialized by the safe bootstrap.
 - [ ] SMTP connection tested using the *"Send Test Email"* button in the notification drawer.
 - [ ] Sample new book added to confirm automatic email notification delivery.
 - [ ] Sample book reserved to verify automated availability alerts.

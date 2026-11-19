@@ -107,11 +107,11 @@ npm run dev:mobile
 
 | Role | Official Email | Default Credential | Access Level |
 | :--- | :--- | :--- | :--- |
-| **System Administrator** | `admin@nsuk.edu.ng` | `Admin@NSUK2026!` | Full Institutional Privileges |
-| **Library Management Alias** | `admin@libnexa.nsuk.edu.ng` | `Admin@NSUK2026!` | Full Institutional Privileges |
+| **System Administrator** | `admin@nsuk.edu.ng` | Generated for Render deployment; see `INITIAL_ADMIN_PASSWORD` in the API service environment | Full Institutional Privileges |
+| **Local seeded administrator** | `admin@nsuk.edu.ng` | Local development only; created by `npm run db:seed` | Full Institutional Privileges |
 
 > **Production Security Note:**
-> All demo accounts, mock transactions, and sample student logins have been removed for production readiness.
+> The production bootstrap does not use a hard-coded password or delete existing data.
 > - **Students**: Self-register through the Web Portal or Mobile Application with their matriculation number and campus email.
 > - **Librarians**: Provisioned directly by the System Administrator via the Admin Portal (`/admin/librarians`).
 
@@ -141,16 +141,21 @@ npm test
 
 ## 🌐 Deployment & Detailed Documentation
 
-For full step-by-step instructions on deploying the Web Portal to **Vercel**, deploying the Backend API, configuring live SMTP, and feature walkthroughs for all personas, see:
+The Render Blueprint deploys the current website, API, and database. For deployment details and feature walkthroughs, see:
 
 📖 **[Complete Deployment & Feature Walkthrough Guide](file:///docs/DEPLOYMENT_AND_USAGE_GUIDE.md)**
 
-### Vercel Quick Deploy
+### Render Website
+- **Website**: `https://libnexa-nsuk-web.onrender.com`
+- **API**: `https://libnexa-nsuk-api.onrender.com/api/v1`
+- **Database bootstrap**: Non-destructive; creates default settings/categories and an initial administrator from the generated Render secret.
+
+### Optional Vercel Deployment
 - **Web App Directory**: `apps/web` (or root using pre-configured [`vercel.json`](file:///vercel.json))
 - **Framework**: `Vite`
 - **Build Command**: `npm run build`
 - **Output Directory**: `dist` (or `apps/web/dist`)
-- **Environment Variable**: `VITE_API_URL=https://your-api-domain.com/api/v1`
+- **Environment Variable**: `VITE_API_URL=https://libnexa-nsuk-api.onrender.com/api/v1` (optional; production has this default)
 
 ---
 

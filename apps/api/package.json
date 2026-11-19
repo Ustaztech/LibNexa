@@ -14,7 +14,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "db:seed": "ts-node src/seed.ts",
-    "start:render": "npm run prisma:push:render && node dist/index.js",
+    "db:bootstrap:render": "ts-node src/bootstrap.ts",
+    "start:render": "npm run prisma:push:render && npm run db:bootstrap:render && node dist/index.js",
     "test": "ts-node tests/run-tests.ts"
   },
   "dependencies": {
